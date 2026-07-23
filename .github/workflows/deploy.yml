@@ -1,0 +1,129 @@
+# =============================================================================
+# Deploy Workflow — runs when a pull request is merged into master
+#
+# This workflow:
+#  1. Builds a Docker image of the Next.js app
+#  2. Pushes the image to GitHub Container Registry (ghcr.io) — free to use!
+#  3. SSHs into your Hostinger VPS
+#  4. Pulls the new Docker image and restarts the container
+#
+# Required GitHub Secrets (set in: Settings → Secrets and variables → Actions):
+#
+#   VPS_HOST          — Your VPS IP address or domain (e.g. 185.xxx.xxx.xxx)
+#   VPS_USER          — SSH username (usually "root" or your created user)
+#   VPS_SSH_KEY       — Your PRIVATE SSH key (the content of ~/.ssh/id_rsa)
+#   VPS_APP_DIR       — Path to the app on the VPS (e.g. /opt/coc-app)
+#   GHCR_TOKEN        — GitHub Personal Access Token with read:packages scope
+#                       (so the VPS can pull the image from ghcr.io)
+#
+# See DEPLOYMENT.md for step-by-step instructions on setting these up.
+# =============================================================================
+
+name: Deploy to VPS
+
+# Only run after a push to master (which happens when a PR is merged)
+on:
+  push:
+    branches: [master]
+
+# Permissions needed to push to GitHub Container Registry
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ── Step 1: Build and push the Docker image ────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      # Pass the image tag to the deploy job
+      image: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up QEMU for cross-platform builds (optional, for ARM VPS support)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx (advanced builder with caching support)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Log in to GitHub Container Registry using the GITHUB_TOKEN
+      # (automatically available in all GitHub Actions workflows)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate Docker image tags and labels from Git metadata
+      # This creates tags like: ghcr.io/owner/coc-app:latest
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=,suffix=,format=short
+
+      # Build the Docker image and push it to ghcr.io
+      # Uses BuildKit cache to speed up subsequent builds
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Build argument — Next.js needs this at build time for NEXT_PUBLIC_ vars
+          build-args: |
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+          # Cache layers from the previous build (speeds up CI dramatically)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Step 2: Deploy to the Hostinger VPS ───────────────────────────────────
+  deploy:
+    name: Deploy to Hostinger VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push  # Only runs if build-and-push succeeded
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # The commands below run on your VPS as if you typed them in a terminal
+          script: |
+            set -e  # Exit immediately if any command fails
+
+            echo "=== Logging in to GitHub Container Registry ==="
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.actor }}" \
+              --password-stdin
+
+            echo "=== Pulling the latest image ==="
+            docker pull ghcr.io/${{ github.repository }}:latest
+
+            echo "=== Moving to the app directory ==="
+            cd ${{ secrets.VPS_APP_DIR }}
+
+            echo "=== Updating docker-compose.prod.yml with the new image ==="
+            export GITHUB_REPOSITORY="${{ github.repository }}"
+
+            echo "=== Restarting the container ==="
+            docker compose -f docker-compose.prod.yml up -d --force-recreate
+
+            echo "=== Removing old unused Docker images (cleanup) ==="
+            docker image prune -f
+
+            echo "=== Deployment complete! ==="
