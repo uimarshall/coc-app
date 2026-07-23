@@ -1,0 +1,72 @@
+/**
+ * Global CSS file for the entire application.
+ *
+ * Tailwind v4 is imported with a single @import statement.
+ * All Tailwind utility classes (flex, text-xl, bg-blue-500, etc.) are
+ * now available in every component without importing anything extra.
+ *
+ * Add your own custom CSS variables and global styles below.
+ */
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   CSS custom properties (design tokens)
+   These define the church brand colours and can be referenced anywhere
+   with var(--colour-name).
+   ------------------------------------------------------------------ */
+:root {
+  /* Brand colours */
+  --color-primary: #1e40af; /* Deep blue — represents trust and reverence  */
+  --color-primary-light: #3b82f6;
+  --color-secondary: #d97706; /* Warm amber — represents warmth and welcome */
+  --color-secondary-light: #fbbf24;
+
+  /* Background / text tokens */
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+
+  /* Font scale */
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark-mode colour overrides (prefers-color-scheme) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #0f172a;
+    --color-foreground: #f8fafc;
+    --color-muted: #94a3b8;
+    --color-border: #1e293b;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Base / reset styles
+   ------------------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Smooth scrolling when clicking anchor links */
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ------------------------------------------------------------------
+   Utility classes not in Tailwind's core
+   ------------------------------------------------------------------ */
+.text-balance {
+  text-wrap: balance;
+}

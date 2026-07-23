@@ -1,0 +1,71 @@
+# =============================================================================
+# CI Workflow — runs on every push and pull request
+#
+# This workflow:
+#  1. Checks out the code
+#  2. Installs Node.js and dependencies
+#  3. Runs the linter (ESLint)
+#  4. Runs unit tests (Vitest)
+#  5. Builds the Next.js app (to catch TypeScript/build errors)
+#
+# If ANY step fails, the workflow is marked as failed and you will NOT
+# be allowed to merge the pull request (if branch protection rules are set up).
+# =============================================================================
+
+name: CI
+
+# Run this workflow on:
+#  - Every push to any branch
+#  - Every pull request targeting the master branch
+on:
+  push:
+    branches: ["**"]  # All branches
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ── Lint and unit tests ────────────────────────────────────────────────────
+  test:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Download the code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Install Node.js 20 (matches our Dockerfile)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # Cache npm dependencies so subsequent runs are faster
+          cache: "npm"
+
+      # 3. Install all dependencies (including devDependencies for tests)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Run ESLint to catch code quality issues
+      - name: Lint
+        run: npm run lint
+
+      # 5. Run unit tests with Vitest
+      - name: Unit tests
+        run: npm run test
+        env:
+          # A dummy value so that db/index.ts does not throw on import.
+          # Unit tests mock the DB and never actually open a connection.
+          # Replace with ${{ secrets.TEST_DATABASE_URL }} if you add DB integration tests.
+          DATABASE_URL: "db://ci-placeholder/test_db"
+
+      # 6. Build the Next.js app
+      # This catches TypeScript type errors and build-time failures
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: "db://ci-placeholder/test_db"
+          BETTER_AUTH_SECRET: "ci-test-secret-at-least-32-characters-long"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          # Skip database connections during build
+          SKIP_DB_VALIDATION: "true"

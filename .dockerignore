@@ -1,0 +1,44 @@
+# Files and folders to exclude from the Docker build context.
+# Excluding unnecessary files makes the Docker build faster and the image smaller.
+
+# Node.js dependencies — Docker installs these fresh inside the container
+node_modules
+
+# Next.js build output — rebuilt inside Docker
+.next
+
+# Test output files
+coverage
+playwright-report
+test-results
+
+# Environment files — NEVER copy secrets into a Docker image!
+# Pass them via environment variables or Docker secrets at runtime.
+.env
+.env.local
+.env.*.local
+
+# Version control
+.git
+.gitignore
+
+# Editor config files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Development documentation
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Drizzle migrations (optional — include if you want to run migrations on startup)
+# db/migrations

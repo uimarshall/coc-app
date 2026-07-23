@@ -1,0 +1,66 @@
+# =============================================================================
+# docker-compose.yml — LOCAL DEVELOPMENT
+#
+# Use this file to run the app locally with Docker.
+# It mounts your source code so changes are reflected without rebuilding.
+#
+# Usage:
+#   docker compose up        — start all services
+#   docker compose down      — stop and remove containers
+#   docker compose logs -f   — stream logs
+# =============================================================================
+
+services:
+  # ── Next.js application ────────────────────────────────────────────────────
+  app:
+    # Build from the local Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use the "builder" stage for development (has devDeps)
+    container_name: coc-app-dev
+
+    # Map host port 3000 → container port 3000
+    ports:
+      - "3000:3000"
+
+    # Override the production CMD to use Next.js dev server
+    command: npm run dev
+
+    # Mount source code so file changes are immediately visible
+    volumes:
+      - .:/app
+      - /app/node_modules  # Keep the container's node_modules separate
+      - /app/.next         # Keep the container's build cache separate
+
+    # Load environment variables from .env.local (create this from .env.example)
+    env_file:
+      - .env.local
+
+    environment:
+      NODE_ENV: development
+
+    # Restart automatically if the container crashes
+    restart: unless-stopped
+
+  # ── Optional: local PostgreSQL for offline development ────────────────────
+  # Uncomment this block if you want a local DB instead of Neon.
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: coc-db-dev
+  #   environment:
+  #     POSTGRES_USER: coc_user
+  #     POSTGRES_PASSWORD: dev_password_change_me
+  #     POSTGRES_DB: coc_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U coc_user"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+# volumes:
+#   postgres_data:
